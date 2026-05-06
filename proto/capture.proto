@@ -1,0 +1,68 @@
+// proto/capture.proto
+// Wire format for client <-> sync. Versioned for forward compatibility.
+// Adding fields: pick the next free number. Removing fields: move the number
+// into `reserved` so old clients that still send it never collide with a
+// re-used field id. Renaming: reserve the old name as well.
+//
+// Per ADR-002: capture_items append-only, idempotency on (device_id, client_seq).
+
+syntax = "proto3";
+
+package quiet.capture.v1;
+
+option java_package = "app.quiet.capture.v1";
+option java_multiple_files = true;
+option swift_prefix = "Quiet";
+
+// One captured item. Mirrors schema/capture.sql.
+message CaptureItem {
+    string id           = 1;  // ULID
+    string raw_text     = 2;
+    double captured_at  = 3;  // unix epoch seconds
+    string device_id    = 4;
+    int64  client_seq   = 5;
+    Source source       = 6;
+
+    enum Source {
+        SOURCE_UNSPECIFIED = 0;
+        SOURCE_SHEET       = 1;  // in-app capture sheet
+        SOURCE_VOICE       = 2;
+        SOURCE_EMAIL       = 3;
+        SOURCE_PLUGIN      = 4;
+        SOURCE_HOTKEY      = 5;
+        SOURCE_DRAG        = 6;
+        SOURCE_POST_CALL   = 7;
+    }
+
+    // Reserved for fields that are intentionally not used in v1
+    // and must not be re-allocated by accident.
+    reserved 7 to 15;
+    reserved "source_ref", "user_id";
+}
+
+// Envelope event for the sync stream. Phase 0/1 only carries CAPTURED;
+// triage/closure events arrive when their tables land in Phase 1+.
+message SyncEvent {
+    string  event_id     = 1;  // ULID
+    string  device_id    = 2;
+    int64   client_seq   = 3;
+    double  occurred_at  = 4;
+    Type    type         = 5;
+
+    oneof payload {
+        CaptureItem captured = 10;
+    }
+
+    enum Type {
+        TYPE_UNSPECIFIED = 0;
+        TYPE_CAPTURED    = 1;
+        // Reserved Phase 1+ event types so wire numbers do not drift:
+        // TRIAGED   = 2;
+        // CLOSED    = 3;
+        // RESURFACED = 4;
+    }
+
+    reserved 6 to 9;
+    reserved 11 to 19;
+    reserved "user_id", "tenant_id";
+}

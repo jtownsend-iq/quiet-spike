@@ -1,0 +1,15 @@
+# supabase/powersync/sync_rules.yaml
+# Per-user filter; no cross-user reads. Mirrors RLS in
+# supabase/migrations/0001_capture_items.sql so a sync-rule misconfiguration
+# cannot exfiltrate data the database itself would refuse to return.
+#
+# Apply by pasting into the PowerSync Cloud dashboard: Sync rules > Edit.
+# See TOOLCHAIN.md step "Set up PowerSync Cloud sandbox".
+
+bucket_definitions:
+  user_capture:
+    # One bucket per authenticated user. user_id is the JWT subject set by
+    # Supabase Auth and forwarded to PowerSync via the JWT auth provider.
+    parameters: SELECT request.user_id() AS user_id
+    data:
+      - SELECT * FROM capture_items WHERE user_id = bucket.user_id

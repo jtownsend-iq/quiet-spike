@@ -1,0 +1,48 @@
+# --- secrets / local config ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.p12
+*.mobileprovision
+*.cer
+
+# --- spike outputs ---
+tests/run/
+spike/out/
+*.jsonl
+!tests/fixtures/*.jsonl
+
+# --- editor / OS ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- node (only used for fixture regen) ---
+node_modules/
+npm-debug.log*
+
+# --- ios (filled in session 3) ---
+ios/**/build/
+ios/**/DerivedData/
+ios/**/.build/
+ios/**/Pods/
+ios/**/*.xcworkspace
+ios/**/*.xcodeproj
+ios/**/Package.resolved
+*.xcuserstate
+
+# --- android (filled in session 2) ---
+android/**/build/
+android/**/.gradle/
+android/**/local.properties
+android/**/*.iml
+android/**/captures/
