@@ -49,11 +49,14 @@ targets:
     resources:
       - path: Resources
         type: folder
-      # The schema-of-record. Bundled verbatim so GRDB executes the
-      # same DDL the Android SQLDelight target consumes. Hand-editing
-      # the .sq is forbidden on Android; on iOS the source IS the .sql,
-      # so any schema change is a single commit there.
-      - path: ../../schema/capture.sql
+      # NOTE: schema/capture.sql is *not* bundled — xcodegen path
+      # resolution for files outside the project tree dropped it from
+      # the .ipa silently in the first device run, which made
+      # CaptureStore.bootstrapSchema throw and the field never clear.
+      # The schema is now inlined in CaptureStore.swift; the Android
+      # target still consumes schema/capture.sql verbatim and the
+      # :app:verifySchemaInSync gradle task is the canonical drift
+      # guard. If the schema changes, mirror it in CaptureStore.swift.
     info:
       path: Generated/Info.plist
       properties:

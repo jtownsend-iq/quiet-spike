@@ -28,17 +28,33 @@ import os.log
 struct CaptureView: View {
     @State private var text: String = ""
     @State private var firstCharStart: UInt64? = nil
+    @State private var scenario: String = LatencyLog.shared.currentScenario()
     @FocusState private var focused: Bool
 
     @StateObject private var model = CaptureViewModel()
 
+    private static let scenarios = ["A", "B", "C", "D"]
     private static let viewLog = Logger(subsystem: "app.quiet.spike", category: "view")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Quiet — capture")
-                .font(QuietTokens.bodyStrong)
-                .foregroundStyle(QuietTokens.textPrimary)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Quiet — capture")
+                    .font(QuietTokens.bodyStrong)
+                    .foregroundStyle(QuietTokens.textPrimary)
+                Spacer()
+                // Scenario indicator. Tap to cycle A → B → C → D so we
+                // can run the spike protocol without a rebuild between
+                // scenarios. Subtle — the spike is the field, not this.
+                Text("scenario \(scenario)")
+                    .font(QuietTokens.meta)
+                    .foregroundStyle(QuietTokens.textTertiary)
+                    .onTapGesture {
+                        let i = (Self.scenarios.firstIndex(of: scenario) ?? 0)
+                        scenario = Self.scenarios[(i + 1) % Self.scenarios.count]
+                        LatencyLog.shared.setScenario(scenario)
+                    }
+            }
 
             captureField
                 .frame(minHeight: 56)
@@ -103,6 +119,16 @@ struct CaptureView: View {
                 }
             } catch {
                 Self.viewLog.error("commit failed: \(error.localizedDescription, privacy: .public)")
+                // Surface the failure to latency.jsonl as a sentinel so the
+                // user sees it on the next pull even without idevicesyslog.
+                // value_ms encodes the elapsed time before the throw so
+                // we can tell whether GRDB blocked or threw immediately.
+                let elapsedNs = machDeltaNs(start: tSendNs, end: mach_absolute_time())
+                LatencyLog.shared.record(
+                    metric: "commit_error",
+                    valueMs: elapsedNs.nsToMs(),
+                    clientSeq: -1
+                )
             }
         }
         .padding(.vertical, 12)

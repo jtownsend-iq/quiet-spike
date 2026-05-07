@@ -29,17 +29,32 @@ final class CaptureStore: @unchecked Sendable {
         try bootstrapSchema()
     }
 
-    /// Apply schema/capture.sql verbatim. Idempotent — every CREATE
-    /// statement uses IF NOT EXISTS so repeated launches are no-ops.
+    /// Apply the capture schema. Inlined verbatim from schema/capture.sql
+    /// rather than bundled — xcodegen's path resolution for files outside
+    /// the project tree is fiddly and that's what tripped up the first
+    /// device run (run 25469909765's .ipa shipped without capture.sql in
+    /// the bundle, so CaptureStore.init threw and the field never cleared).
+    /// If schema/capture.sql changes, mirror the change here. The Android
+    /// target still consumes schema/capture.sql via SQLDelight; the
+    /// :app:verifySchemaInSync gradle task is the canonical drift guard.
+    private static let schemaSQL = """
+        CREATE TABLE IF NOT EXISTS capture_items (
+            id           TEXT    PRIMARY KEY,
+            raw_text     TEXT    NOT NULL,
+            captured_at  REAL    NOT NULL,
+            device_id    TEXT    NOT NULL,
+            client_seq   INTEGER NOT NULL,
+            source       TEXT    NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_capture_items_device_seq
+            ON capture_items (device_id, client_seq);
+        CREATE INDEX IF NOT EXISTS ix_capture_items_captured_at
+            ON capture_items (captured_at);
+        """
+
     private func bootstrapSchema() throws {
-        guard let url = Bundle.main.url(forResource: "capture", withExtension: "sql") else {
-            throw NSError(domain: "QuietSpike", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey:
-                            "capture.sql missing from bundle — check project.yml resources"])
-        }
-        let sql = try String(contentsOf: url, encoding: .utf8)
         try dbQueue.write { db in
-            try db.execute(sql: sql)
+            try db.execute(sql: Self.schemaSQL)
         }
     }
 
