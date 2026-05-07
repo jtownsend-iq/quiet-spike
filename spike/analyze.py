@@ -170,6 +170,11 @@ def render(rows: list[dict]) -> tuple[str, bool]:
 
 
 def main(argv: list[str]) -> int:
+    # Windows consoles default to cp1252 and will UnicodeEncodeError on the
+    # ≤ / ✅ / ❌ glyphs in the report. Reconfigure to UTF-8 unconditionally;
+    # POSIX is already UTF-8 so this is a no-op there.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("paths", nargs="+", type=Path, help="one or more JSONL log files")
     ap.add_argument(

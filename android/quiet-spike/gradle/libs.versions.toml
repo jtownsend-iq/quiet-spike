@@ -1,0 +1,64 @@
+# android/quiet-spike/gradle/libs.versions.toml
+# Single source of truth for plugin and library versions used by the spike.
+# Bump here, never inline. Keep dependencies minimal — the spike measures
+# the hot path, not a dependency tree.
+
+[versions]
+# Core toolchain
+agp                  = "8.7.3"        # Android Gradle Plugin
+kotlin               = "2.0.21"       # Kotlin + Compose Compiler
+compose-bom          = "2024.12.01"
+activity-compose     = "1.9.3"
+
+# Persistence
+sqldelight           = "2.0.2"
+
+# Sync
+powersync            = "1.0.0-BETA29"
+
+# Auth (Supabase Kotlin SDK; postgrest only — auth via gotrue)
+ktor                 = "3.0.1"
+supabase             = "3.0.2"        # io.github.jan-tennert.supabase
+
+# Misc
+security-crypto      = "1.1.0-alpha06" # EncryptedSharedPrefs (device_id)
+serialization        = "1.7.3"
+coroutines           = "1.9.0"
+junit                = "4.13.2"
+
+[libraries]
+# Compose
+androidx-activity-compose      = { group = "androidx.activity",    name = "activity-compose",  version.ref = "activity-compose" }
+androidx-compose-bom           = { group = "androidx.compose",      name = "compose-bom",      version.ref = "compose-bom" }
+androidx-compose-ui            = { group = "androidx.compose.ui",   name = "ui" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-ui-tooling    = { group = "androidx.compose.ui",   name = "ui-tooling" }
+androidx-compose-foundation    = { group = "androidx.compose.foundation", name = "foundation" }
+androidx-compose-material3     = { group = "androidx.compose.material3", name = "material3" }
+
+# SQLDelight
+sqldelight-android-driver      = { group = "app.cash.sqldelight",   name = "android-driver",   version.ref = "sqldelight" }
+sqldelight-coroutines          = { group = "app.cash.sqldelight",   name = "coroutines-extensions", version.ref = "sqldelight" }
+
+# PowerSync
+powersync-core                 = { group = "com.powersync",         name = "core",             version.ref = "powersync" }
+powersync-connector-supabase   = { group = "com.powersync",         name = "connector-supabase", version.ref = "powersync" }
+
+# Supabase Kotlin (GoTrue auth + Postgrest)
+supabase-bom                   = { group = "io.github.jan-tennert.supabase", name = "bom",     version.ref = "supabase" }
+supabase-gotrue                = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
+supabase-postgrest             = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
+ktor-client-cio                = { group = "io.ktor",               name = "ktor-client-cio",  version.ref = "ktor" }
+
+# Misc
+androidx-security-crypto       = { group = "androidx.security",     name = "security-crypto",  version.ref = "security-crypto" }
+kotlinx-serialization-json     = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-coroutines-android     = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+junit                          = { group = "junit",                 name = "junit",            version.ref = "junit" }
+
+[plugins]
+android-application      = { id = "com.android.application",                      version.ref = "agp" }
+kotlin-android           = { id = "org.jetbrains.kotlin.android",                 version.ref = "kotlin" }
+kotlin-compose           = { id = "org.jetbrains.kotlin.plugin.compose",          version.ref = "kotlin" }
+kotlin-serialization     = { id = "org.jetbrains.kotlin.plugin.serialization",    version.ref = "kotlin" }
+sqldelight               = { id = "app.cash.sqldelight",                          version.ref = "sqldelight" }

@@ -59,24 +59,55 @@ jobs:
           python spike/analyze.py --strict tests/fixtures/synthetic.jsonl
 
   android:
-    name: android (placeholder until session 2)
+    name: android (assembleDebug + verifySchemaInSync)
     runs-on: ubuntu-latest
     needs: lint
+    defaults:
+      run:
+        working-directory: android/quiet-spike
     steps:
       - uses: actions/checkout@v4
-      - name: No-op gradle build
-        # The android/ directory is empty in session 1. Once SPIKE-01 day 2
-        # lands, swap this for actions/setup-java + gradle/gradle-build-action
-        # and run `./gradlew assembleDebug` against android/quiet-spike.
-        # Detection: presence of android/quiet-spike/build.gradle.kts means
-        # the project has been scaffolded and the real build should run.
-        run: |
-          if [ -f android/quiet-spike/build.gradle.kts ]; then
-            echo "android project scaffolded — wire the real gradle build now."
-            exit 1
-          fi
-          echo "android/ intentionally unscaffolded in session 1 — placeholder OK"
 
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Synthesise .env from GitHub Actions secrets so the BuildConfig
+      # values resolve. Secrets are NEVER printed (`set +x`); the file is
+      # written to the repo root because app/build.gradle.kts looks there.
+      # All secrets are optional — if any are missing, the corresponding
+      # BuildConfig field is empty and the runtime sandbox call simply
+      # logs a warning. This keeps the assembleDebug job green even when
+      # Precondition B (Supabase/PowerSync) isn't yet configured.
+      - name: Synthesise .env from secrets
+        working-directory: ${{ github.workspace }}
+        run: |
+          set +x
+          {
+            echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}"
+            echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}"
+            echo "POWERSYNC_URL=${{ secrets.POWERSYNC_URL }}"
+            echo "QUIET_TEST_USER_EMAIL=${{ secrets.QUIET_TEST_USER_EMAIL }}"
+            echo "QUIET_TEST_USER_PASSWORD=${{ secrets.QUIET_TEST_USER_PASSWORD }}"
+            echo "QUIET_TEST_USER_ID=${{ secrets.QUIET_TEST_USER_ID }}"
+          } > .env
+
+      - name: Copy schema → SQLDelight source set
+        run: ./gradlew :app:copyCaptureSchema
+      - name: Verify schema is in sync (no drift)
+        run: ./gradlew :app:verifySchemaInSync
+      - name: Assemble debug
+        run: ./gradlew :app:assembleDebug
   ios:
     name: ios (verify macos-14 runner)
     runs-on: macos-14

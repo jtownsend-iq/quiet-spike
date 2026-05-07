@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backup/restore opt-out for the spike. The latency log is intentionally
+  ephemeral — it lives under getExternalFilesDir(null) and is pulled by
+  adb after each scenario, never restored across installs. We don't want
+  Android Auto Backup to silently restore a stale device_id.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+    </device-transfer>
+</data-extraction-rules>

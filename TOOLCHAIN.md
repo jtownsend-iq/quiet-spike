@@ -19,7 +19,18 @@ Sideloadly; `idevicesyslog` pulls measurement logs back over USB.
 
 Node is only used to (re)generate `tests/fixtures/synthetic.jsonl`. CI runs
 `spike/analyze.py` under Python 3.12 on `ubuntu-latest`; you do not need
-Python locally for normal operation.
+Python locally for normal operation, but a local install lets you iterate
+the analyzer without pushing.
+
+```powershell
+winget install Python.Python.3.12 -e --accept-source-agreements --accept-package-agreements --silent
+py --version    # expect Python 3.12.x
+py spike\analyze.py --strict tests\fixtures\synthetic.jsonl
+# Last lines should print 'Verdict: PASS' and exit 0.
+```
+
+> Note: `analyze.py` reconfigures stdout to UTF-8 at startup so the
+> ≤ / ✅ / ❌ glyphs in the report don't trip the Windows cp1252 console.
 
 ## 1 — Swift toolchain on Windows (for editing only)
 
@@ -192,7 +203,82 @@ After the first push to `main`:
 If `ios` fails: Actions → settings → re-enable, or check that the repo is
 still set to public (free-tier macOS minutes require public visibility).
 
-## 11 — Regenerating the synthetic fixture (rare)
+## 11 — Android toolchain (session 2)
+
+The `android/quiet-spike/` Gradle build needs a JDK and the Android SDK.
+Local installs are required for on-device measurement (`adb`, sideload,
+log pull); CI uses `actions/setup-java` + `gradle/actions/setup-gradle`
+on Ubuntu so it doesn't need any of this.
+
+1. **JDK 21 (Temurin).** Required by AGP 8.7+.
+
+   ```powershell
+   winget install EclipseAdoptium.Temurin.21.JDK -e --accept-source-agreements --accept-package-agreements --silent
+   java -version    # expect openjdk version "21.x"
+   ```
+
+   Set `JAVA_HOME` if Gradle complains it can't find the JDK
+   (`C:\Program Files\Eclipse Adoptium\jdk-21.x.x-hotspot`).
+
+2. **Android Studio (Ladybug or newer).** Provides the SDK manager,
+   Compose preview, and the platform-tools (`adb`).
+
+   ```powershell
+   winget install Google.AndroidStudio -e --accept-source-agreements --accept-package-agreements
+   ```
+
+   First run: open Android Studio → SDK Manager → install
+   - Android SDK Platform 35 (`compileSdk = 35`)
+   - Android SDK Build-Tools 35.x
+   - Android SDK Platform-Tools (`adb`)
+   - Android SDK Command-Line Tools (latest)
+
+3. **Platform Tools standalone (alternative to step 2 if you prefer
+   not to install Android Studio).**
+
+   ```powershell
+   winget install Google.PlatformTools -e --accept-source-agreements --accept-package-agreements
+   adb --version
+   ```
+
+4. **Pixel 6a setup.**
+
+   - Settings → About phone → tap **Build number** 7× to enable
+     Developer options.
+   - Settings → System → Developer options → enable **USB debugging**.
+   - Plug into USB; the first `adb devices` call triggers an
+     "Allow USB debugging from this computer?" dialog on the phone —
+     accept and tick "Always allow."
+
+   Verify:
+
+   ```powershell
+   adb devices    # should list one device, status "device" not "unauthorized"
+   ```
+
+5. **Build the spike target.**
+
+   ```powershell
+   cd android\quiet-spike
+   .\gradlew.bat :app:assembleDebug
+   adb install -r app\build\outputs\apk\debug\app-debug.apk
+   adb shell am start -n app.quiet.spike/.CaptureActivity
+   ```
+
+   `.env` must exist at the repo root with all six values set, or
+   `BuildConfig` keys come back empty and the sandbox sign-in/upload
+   silently no-ops (local capture and latency logging still work).
+
+6. **Pull latency logs after a scenario run.**
+
+   ```powershell
+   adb pull /sdcard/Android/data/app.quiet.spike/files/latency.jsonl `
+            tests\run\android-A-B-$(Get-Date -Format yyyyMMdd).jsonl
+   py spike\analyze.py --strict tests\run\android-A-B-*.jsonl `
+            > spike\results\android-A-B-$(Get-Date -Format yyyyMMdd).md
+   ```
+
+## 12 — Regenerating the synthetic fixture (rare)
 
 ```powershell
 node tests\fixtures\_generate_synthetic.mjs   # writes tests\fixtures\synthetic.jsonl

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirror of the Compose tokens; XML duplication exists only because the
+         system Activity theme is set in XML before Compose initialises. -->
+    <color name="bg_canvas">#FAFAF7</color>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Capture surface contract (CLAUDE.md, design system). Verbatim. -->
+    <string name="capture_placeholder">What just landed.</string>
+</resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Pure platform theme to host the Compose Activity. All design tokens
+      (canvas, accent-ink, hairline) live in QuietTheme.kt — this XML only
+      makes the system bars match the canvas colour so the app doesn't
+      flash white before Compose paints.
+    -->
+    <style name="Theme.QuietSpike" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/bg_canvas</item>
+        <item name="android:statusBarColor">@color/bg_canvas</item>
+        <item name="android:navigationBarColor">@color/bg_canvas</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
