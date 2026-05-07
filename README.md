@@ -105,9 +105,9 @@ Three jobs in `.github/workflows/ci.yml`:
   fixture. This is the green light for committing schema changes.
 - **android** (ubuntu-latest): placeholder until session 2 wires
   `./gradlew assembleDebug` against `android/quiet-spike/`.
-- **ios** (macos-14): runs `xcodebuild -version` and installs `xcodegen`
-  to verify the macOS runner works end-to-end **before** session 3 depends
-  on it.
+- **ios** (macos-15): runs `xcodegen` + `xcodebuild` to produce an
+  unsigned `QuietSpike-unsigned.ipa` workflow artifact. Sideloadly
+  (TOOLCHAIN.md §4) re-signs it with a free Apple ID at install time.
 
 ## What's locked, in one place
 
