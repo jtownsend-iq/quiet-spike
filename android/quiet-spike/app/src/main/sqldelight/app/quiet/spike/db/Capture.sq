@@ -1,0 +1,20 @@
+-- android/quiet-spike/app/src/main/sqldelight/app/quiet/spike/db/CaptureQueries.sq
+--
+-- Hand-written labeled queries for SQLDelight. The schema-of-record lives
+-- in schema/capture.sql and is copied verbatim into CaptureItems.sq by
+-- :app:copyCaptureSchema (gitignored, generated). This file holds the
+-- query labels SQLDelight needs to generate Kotlin functions; they cannot
+-- live in schema/capture.sql because the `name:` syntax isn't valid SQL
+-- and would break the lint job's `sqlite3 :memory: < schema/capture.sql`
+-- check.
+--
+-- Convention: one labeled query per file-level identifier. Append-only —
+-- ADR-002 makes capture_items append-only, so no UPDATE / DELETE queries
+-- are defined here.
+
+insertCaptureItem:
+INSERT INTO capture_items (id, raw_text, captured_at, device_id, client_seq, source)
+VALUES (?, ?, ?, ?, ?, ?);
+
+countAll:
+SELECT count(*) FROM capture_items;

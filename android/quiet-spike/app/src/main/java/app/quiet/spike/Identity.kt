@@ -1,6 +1,6 @@
 // android/quiet-spike/app/src/main/java/app/quiet/spike/Identity.kt
 //
-// device_id is a stable per-install UUID stored in EncryptedSharedPrefs.
+// device_id is a stable per-install UUID stored in EncryptedSharedPreferences.
 // We don't reuse Android's SSAID — it's reset on factory wipe but also
 // shared across apps signed with the same key, and we want each install
 // to be independent in the latency log.
@@ -12,7 +12,7 @@
 package app.quiet.spike
 
 import android.content.Context
-import androidx.security.crypto.EncryptedSharedPrefs
+import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
@@ -60,10 +60,10 @@ object Identity {
         val mk = MasterKey.Builder(ctx)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
-        EncryptedSharedPrefs.create(
+        EncryptedSharedPreferences.create(
             ctx, FILE, mk,
-            EncryptedSharedPrefs.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPrefs.PrefValueEncryptionScheme.AES256_GCM,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
     }
 }

@@ -17,9 +17,8 @@
 //
 //   t_keystroke : empty → first char typed → next frame rendered.
 //   t_local     : Send → SQLite txn committed AND field cleared.
-//   t_e2e       : Send → Postgres confirms the row (Supabase Postgrest
-//                 SELECT by (device_id, client_seq) — minimal round trip,
-//                 no PowerSync upload-progress callback in BETA29 yet).
+//   t_e2e       : DEFERRED until Precondition B (real Supabase + PowerSync
+//                 sandbox) is live. See SyncStack.kt for context.
 
 package app.quiet.spike
 
@@ -49,11 +48,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 
 class CaptureActivity : ComponentActivity() {
 
@@ -88,7 +85,10 @@ class CaptureActivity : ComponentActivity() {
         val id = Ulid.generate()
 
         // Local SQLite write (the t_local critical section).
-        sync.captureDb.captureItemsQueries.insert(
+        // captureQueries comes from app/src/main/sqldelight/.../Capture.sq —
+        // hand-written labeled queries, kept separate from the generated
+        // schema in CaptureItems.sq.
+        sync.captureDb.captureQueries.insertCaptureItem(
             id = id,
             raw_text = text,
             captured_at = capturedAtSec,
@@ -98,35 +98,14 @@ class CaptureActivity : ComponentActivity() {
         )
         val tCommitted = System.nanoTime()
 
-        // E2E ACK: poll Postgrest until the row is visible. Cheap because
-        // the row PK is the ULID and Supabase REST returns ≤1 row.
-        sync.scope.launch {
-            val ackStart = tStart
-            val deadlineNs = ackStart + 15_000_000_000L  // 15 s safety net
-            try {
-                while (System.nanoTime() < deadlineNs) {
-                    val rows = sync.supabase.from("capture_items")
-                        .select { filter { eq("id", id) }; limit(1) }
-                        .decodeList<CaptureRowDto>()
-                    if (rows.isNotEmpty()) {
-                        val tAck = System.nanoTime()
-                        log.record("t_e2e", (tAck - ackStart).nsToMs(), seq)
-                        return@launch
-                    }
-                    kotlinx.coroutines.delay(75)
-                }
-            } catch (_: Throwable) {
-                // Ignore — t_e2e simply doesn't get logged for this capture.
-            }
-        }
+        // t_e2e (Send → Postgres ACK) is deferred until Precondition B is
+        // live — see SyncStack.kt for the explanation. Scenarios A and B
+        // measure t_keystroke and t_local only, both of which are local.
 
         CommitResult(seq = seq, tStart = tStart, tCommitted = tCommitted)
     }
 
     data class CommitResult(val seq: Long, val tStart: Long, val tCommitted: Long)
-
-    @Serializable
-    private data class CaptureRowDto(val id: String)
 
     // ---- Compose UI ------------------------------------------------------
 
