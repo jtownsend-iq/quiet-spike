@@ -14,6 +14,13 @@
 import java.io.FileInputStream
 import java.security.MessageDigest
 import java.util.Properties
+import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 
 plugins {
     alias(libs.plugins.android.application)
@@ -138,64 +145,73 @@ dependencies {
 // source set verbatim on every build, and a separate verifySchemaInSync task
 // hashes both files so CI fails the moment they drift. Hand-editing the .sq
 // is forbidden — the canonical file is at quiet/schema/capture.sql.
+//
+// Both tasks are configuration-cache safe: they declare RegularFileProperty
+// inputs on a typed task class instead of capturing script-level vars in
+// doFirst/doLast lambdas. Copy uses provider-based path resolution.
 // ----------------------------------------------------------------------------
-val captureSchemaSource = rootProject.file("../../schema/capture.sql")
-val captureSchemaTarget = layout.projectDirectory.file(
-    "src/main/sqldelight/app/quiet/spike/db/CaptureItems.sq"
-)
+val captureSchemaSourceProvider = rootProject.layout.projectDirectory
+    .file("../../schema/capture.sql")
+val captureSchemaTargetProvider = layout.projectDirectory
+    .file("src/main/sqldelight/app/quiet/spike/db/CaptureItems.sq")
 
 val copyCaptureSchema by tasks.registering(Copy::class) {
-    from(captureSchemaSource)
-    into(captureSchemaTarget.asFile.parentFile)
+    from(captureSchemaSourceProvider)
+    into(captureSchemaTargetProvider.asFile.parentFile)
     rename { "CaptureItems.sq" }
-    inputs.file(captureSchemaSource)
-    outputs.file(captureSchemaTarget)
-    doFirst {
-        if (!captureSchemaSource.exists()) {
-            throw GradleException(
-                "[copyCaptureSchema] source missing: ${captureSchemaSource.absolutePath}"
-            )
-        }
-    }
 }
 
-val verifySchemaInSync by tasks.registering {
-    description = "Fails if android/quiet-spike's CaptureItems.sq has drifted from schema/capture.sql."
-    group = "verification"
-    inputs.file(captureSchemaSource)
-    inputs.file(captureSchemaTarget)
-    doLast {
-        if (!captureSchemaTarget.asFile.exists()) {
+abstract class VerifySchemaInSyncTask : DefaultTask() {
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE)
+    abstract val source: RegularFileProperty
+
+    @get:InputFile @get:PathSensitive(PathSensitivity.NONE)
+    abstract val target: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val srcFile = source.get().asFile
+        val dstFile = target.get().asFile
+        if (!dstFile.exists()) {
             throw GradleException(
-                "[verifySchemaInSync] target missing: ${captureSchemaTarget.asFile.absolutePath}. " +
+                "[verifySchemaInSync] target missing: ${dstFile.absolutePath}. " +
                 "Run :app:copyCaptureSchema first."
             )
         }
-        fun sha256(f: java.io.File): String {
-            val md = MessageDigest.getInstance("SHA-256")
-            f.inputStream().use { stream ->
-                val buf = ByteArray(8192)
-                while (true) {
-                    val n = stream.read(buf)
-                    if (n <= 0) break
-                    md.update(buf, 0, n)
-                }
-            }
-            return md.digest().joinToString("") { "%02x".format(it) }
-        }
-        val srcHash = sha256(captureSchemaSource)
-        val dstHash = sha256(captureSchemaTarget.asFile)
+        val srcHash = sha256(srcFile)
+        val dstHash = sha256(dstFile)
         if (srcHash != dstHash) {
             throw GradleException(
                 "[verifySchemaInSync] DRIFT detected.\n" +
-                "  source: ${captureSchemaSource.absolutePath}  sha256=$srcHash\n" +
-                "  target: ${captureSchemaTarget.asFile.absolutePath}  sha256=$dstHash\n" +
+                "  source: ${srcFile.absolutePath}  sha256=$srcHash\n" +
+                "  target: ${dstFile.absolutePath}  sha256=$dstHash\n" +
                 "Fix: run :app:copyCaptureSchema and commit the result. " +
                 "Never hand-edit the .sq file."
             )
         }
         logger.lifecycle("[verifySchemaInSync] OK ($srcHash)")
     }
+
+    private fun sha256(f: java.io.File): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        f.inputStream().use { stream ->
+            val buf = ByteArray(8192)
+            while (true) {
+                val n = stream.read(buf)
+                if (n <= 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+}
+
+val verifySchemaInSync by tasks.registering(VerifySchemaInSyncTask::class) {
+    description = "Fails if android/quiet-spike's CaptureItems.sq has drifted from schema/capture.sql."
+    group = "verification"
+    source.set(captureSchemaSourceProvider)
+    target.set(captureSchemaTargetProvider)
+    dependsOn(copyCaptureSchema)
 }
 
 // Run the copy before SQLDelight reads sources.
