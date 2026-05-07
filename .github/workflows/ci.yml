@@ -109,7 +109,7 @@ jobs:
       - name: Assemble debug
         run: ./gradlew :app:assembleDebug
   ios:
-    name: ios (verify macos-14 runner)
+    name: ios (xcodebuild + unsigned .ipa artifact)
     runs-on: macos-14
     needs: lint
     steps:
@@ -118,21 +118,68 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Select Xcode 16
+        run: |
+          # The macos-14 image ships Xcode 15.x by default. Quiet Spike
+          # uses iOS 17 deployment target with Swift 5.10, so 15 works,
+          # but if 16 is available prefer it for forward-looking syntax.
+          if [ -d /Applications/Xcode_16.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.app
+            xcodebuild -version
+          fi
+
       - name: Install xcodegen
         run: brew install xcodegen
 
-      - name: xcodegen --version
-        run: xcodegen --version
-
-      - name: Placeholder build step
-        # Once SPIKE-01 day 1 lands, swap this for:
-        #   xcodegen generate --spec ios/QuietSpike/project.yml
-        #   xcodebuild -scheme QuietSpike -destination 'generic/platform=iOS' build
-        # Detection: presence of ios/QuietSpike/project.yml means the project
-        # has been scaffolded and the real build should run.
+      - name: Generate Xcode project
+        working-directory: ios/QuietSpike
         run: |
-          if [ -f ios/QuietSpike/project.yml ]; then
-            echo "ios project scaffolded — wire the real xcodebuild now."
+          xcodegen generate --spec project.yml
+          ls -la
+
+      - name: Resolve Swift package dependencies (GRDB)
+        working-directory: ios/QuietSpike
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project QuietSpike.xcodeproj \
+            -scheme QuietSpike
+
+      - name: Build (unsigned, generic iOS device)
+        working-directory: ios/QuietSpike
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project QuietSpike.xcodeproj \
+            -scheme QuietSpike \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Package unsigned .ipa for sideloading
+        # Produces an .ipa that Sideloadly can re-sign with a free Apple ID.
+        # The xcarchive route would also work but pulling the .app out of
+        # DerivedData is faster and avoids the export-options-plist dance.
+        working-directory: ios/QuietSpike
+        run: |
+          set -euo pipefail
+          APP_DIR=$(find build/Build/Products -name "QuietSpike.app" -type d | head -1)
+          if [ -z "$APP_DIR" ]; then
+            echo "QuietSpike.app not found under build/Build/Products"
+            find build/Build/Products -maxdepth 3 -type d
             exit 1
           fi
-          echo "ios/ intentionally unscaffolded in session 1 — placeholder OK"
+          mkdir -p out/Payload
+          cp -R "$APP_DIR" out/Payload/
+          ( cd out && zip -qr QuietSpike-unsigned.ipa Payload )
+          ls -la out/QuietSpike-unsigned.ipa
+
+      - name: Upload unsigned .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuietSpike-unsigned-ipa
+          path: ios/QuietSpike/out/QuietSpike-unsigned.ipa
+          retention-days: 14

@@ -1,0 +1,84 @@
+# ios/QuietSpike/project.yml
+#
+# xcodegen spec for the SPIKE-01 iOS target. Run on the macos-14 CI
+# runner (and locally if you ever land on a Mac):
+#   xcodegen generate --spec ios/QuietSpike/project.yml
+#   xcodebuild -scheme QuietSpike -destination 'generic/platform=iOS' \
+#              CODE_SIGNING_ALLOWED=NO build
+#
+# Bundle id matches the Android applicationId family (app.quiet.spike).
+# Free Apple ID sideloading via Sideloadly (TOOLCHAIN.md §4) re-signs
+# this with a per-developer suffix at install time.
+
+name: QuietSpike
+options:
+  bundleIdPrefix: app.quiet
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "0.1.0-spike"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGN_IDENTITY: ""
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    SUPPORTS_MACCATALYST: NO
+    TARGETED_DEVICE_FAMILY: "1"   # iPhone only
+
+# GRDB.swift via SPM. Pin to a 6.x release; APIs we use (DatabaseQueue,
+# write/read, Statement, Configuration) are stable across the 6.x line.
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: "6.29.3"
+
+targets:
+  QuietSpike:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/QuietSpike
+        type: group
+    resources:
+      - path: Resources
+        type: folder
+      # The schema-of-record. Bundled verbatim so GRDB executes the
+      # same DDL the Android SQLDelight target consumes. Hand-editing
+      # the .sq is forbidden on Android; on iOS the source IS the .sql,
+      # so any schema change is a single commit there.
+      - path: ../../schema/capture.sql
+    info:
+      path: Generated/Info.plist
+      properties:
+        CFBundleDisplayName: Quiet Spike
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen:
+          UIColorName: bg_canvas
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+        # File-sharing so adb-equivalent (Apple Configurator / iCloud Drive
+        # sync) can pull latency.jsonl from Documents/.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.quiet.spike
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UISupportsDocumentBrowser: NO
+    dependencies:
+      - package: GRDB
+        product: GRDB

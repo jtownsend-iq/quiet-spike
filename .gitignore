@@ -30,14 +30,16 @@ venv/
 node_modules/
 npm-debug.log*
 
-# --- ios (filled in session 3) ---
+# --- ios ---
 ios/**/build/
+ios/**/out/
 ios/**/DerivedData/
 ios/**/.build/
 ios/**/Pods/
 ios/**/*.xcworkspace
 ios/**/*.xcodeproj
 ios/**/Package.resolved
+ios/**/Generated/
 *.xcuserstate
 
 # --- android ---
