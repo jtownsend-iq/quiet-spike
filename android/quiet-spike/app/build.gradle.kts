@@ -214,8 +214,12 @@ val verifySchemaInSync by tasks.registering(VerifySchemaInSyncTask::class) {
     dependsOn(copyCaptureSchema)
 }
 
-// Run the copy before SQLDelight reads sources.
-tasks.matching { it.name.startsWith("generate") && it.name.contains("Sqldelight", ignoreCase = true) }
+// Run the copy before SQLDelight reads sources. SQLDelight 2.x names its
+// generation tasks `generate<Variant><DbName>Interface`, e.g.
+// `generateDebugCaptureDatabaseInterface` — the prior filter missed that
+// shape and CI failed in run 25468716935 with an "implicit dependency"
+// validation error from Gradle 8.10.
+tasks.matching { it.name.startsWith("generate") && it.name.endsWith("Interface") }
     .configureEach { dependsOn(copyCaptureSchema) }
 // Belt-and-braces: also bind to preBuild so a clean Compose-only build
 // path doesn't skip the copy.
