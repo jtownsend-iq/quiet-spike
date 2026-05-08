@@ -26,12 +26,19 @@ import QuartzCore
 import os.log
 
 struct CaptureView: View {
+    let sync: SyncStack?
+
     @State private var text: String = ""
     @State private var firstCharStart: UInt64? = nil
     @State private var scenario: String = LatencyLog.shared.currentScenario()
     @FocusState private var focused: Bool
 
-    @StateObject private var model = CaptureViewModel()
+    @StateObject private var model: CaptureViewModel
+
+    init(sync: SyncStack?) {
+        self.sync = sync
+        _model = StateObject(wrappedValue: CaptureViewModel(sync: sync))
+    }
 
     private static let scenarios = ["A", "B", "C", "D"]
     private static let viewLog = Logger(subsystem: "app.quiet.spike", category: "view")
@@ -185,15 +192,18 @@ private func machDeltaNs(start: UInt64, end: UInt64) -> UInt64 {
 
 @MainActor
 final class CaptureViewModel: ObservableObject {
+    /// The local store comes from the app-scope SyncStack so the same
+    /// GRDB queue serves capture, latency logging, and (eventually)
+    /// PowerSync replication. nil when SyncStack.create threw at
+    /// app entry; commit() converts that into a surfaced error rather
+    /// than a silent empty-field-but-no-row.
     private let store: CaptureStore?
 
-    init() {
-        do {
-            self.store = try CaptureStore()
-        } catch {
-            self.store = nil
+    init(sync: SyncStack?) {
+        self.store = sync?.captureStore
+        if sync == nil {
             Logger(subsystem: "app.quiet.spike", category: "viewModel")
-                .error("CaptureStore init failed: \(error.localizedDescription, privacy: .public)")
+                .error("CaptureViewModel init: sync stack unavailable")
         }
     }
 
